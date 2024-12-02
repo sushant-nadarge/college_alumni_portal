@@ -1,63 +1,120 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>College Alumni Portal</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <header>
-        <h1>Welcome to the College Alumni Portal</h1>
-        <nav>
-            <ul>
-                <li><a href="#viewAlumni">View Alumni</a></li>
-                <li><a href="#registerEvent">Register for Event</a></li>
-                <li><a href="#events">Upcoming Events</a></li>
-            </ul>
-        </nav>
-    </header>
+import java.sql.*;
+import java.util.Scanner;
 
-    <main>
-        <!-- View Alumni Section -->
-        <section id="viewAlumni">
-            <h2>Alumni Directory</h2>
-            <div id="alumniList">
-                <!-- Alumni list will be populated here -->
-            </div>
-        </section>
+public class Main {
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/alumni_portal";
+    private static final String USER = "root";
+    private static final String PASS = "sushi123";
 
-        <!-- Event Registration Section -->
-        <section id="registerEvent">
-            <h2>Register for an Event</h2>
-            <form id="eventForm">
-                <label for="alumniName">Alumni Name:</label>
-                <input type="text" id="alumniName" name="alumniName" required>
+    public static void main(String[] args) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+             Scanner scanner = new Scanner(System.in)) {
 
-                <label for="eventName">Event Name:</label>
-                <input type="text" id="eventName" name="eventName" required>
+            System.out.println("Welcome to the College Alumni Portal!");
 
-                <label for="eventDate">Event Date:</label>
-                <input type="date" id="eventDate" name="eventDate" required>
+            while (true) {
+                System.out.println("1. Add Alumni\n2. Register for Event\n3. View Alumni\n4. View Event Registrations\n5. Exit");
+                int choice = scanner.nextInt();
+                scanner.nextLine();  // Consume newline
 
-                <button type="submit">Register</button>
-            </form>
-            <p id="registrationStatus"></p>
-        </section>
+                switch (choice) {
+                    case 1:
+                        addAlumni(conn, scanner);
+                        break;
+                    case 2:
+                        registerForEvent(conn, scanner);
+                        break;
+                    case 3:
+                        viewAlumni(conn);
+                        break;
+                    case 4:
+                        viewEventRegistrations(conn);
+                        break;
+                    case 5:
+                        System.out.println("Goodbye!");
+                        return;
+                    default:
+                        System.out.println("Invalid choice, please try again.");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 
-        <!-- Upcoming Events Section -->
-        <section id="events">
-            <h2>Upcoming Events</h2>
-            <div id="eventList">
-                <!-- Event list will be populated here -->
-            </div>
-        </section>
-    </main>
+    // Method to add alumni to the alumni table
+    private static void addAlumni(Connection conn, Scanner scanner) throws SQLException {
+        System.out.println("Enter alumni name:");
+        String name = scanner.nextLine();
+        System.out.println("Enter graduation year:");
+        int gradYear = scanner.nextInt();
+        scanner.nextLine();  // Consume newline
 
-    <footer>
-        <p>&copy; 2024 College Alumni Portal</p>
-    </footer>
+        String query = "INSERT INTO alumni (name, graduation_year) VALUES (?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setInt(2, gradYear);
+            pstmt.executeUpdate();
+            System.out.println("Alumni added successfully!");
+        } catch (SQLException e) {
+            System.out.println("Error adding alumni: " + e.getMessage());
+        }
+    }
 
-    <script src="script.js"></script>
-</body>
-</html>
+    // Method to register an alumni for an event
+    private static void registerForEvent(Connection conn, Scanner scanner) throws SQLException {
+        System.out.println("Enter alumni name:");
+        String name = scanner.nextLine();
+        
+        // Check if the alumni name exists
+        String checkQuery = "SELECT COUNT(*) FROM alumni WHERE name = ?";
+        try (PreparedStatement pstmtCheck = conn.prepareStatement(checkQuery)) {
+            pstmtCheck.setString(1, name);
+            try (ResultSet rs = pstmtCheck.executeQuery()) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    // If no alumni found with this name
+                    System.out.println("Alumni with this name does not exist. Please add the alumni first.");
+                    return; // Exit the method if alumni doesn't exist
+                }
+            }
+        }
+
+        // If alumni exists, proceed with event registration
+        System.out.println("Enter event name:");
+        String event = scanner.nextLine();
+
+        String query = "INSERT INTO event_registrations (alumni_name, event_name) VALUES (?, ?)";
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, name);
+            pstmt.setString(2, event);
+            pstmt.executeUpdate();
+            System.out.println("Event registration successful!");
+        } catch (SQLException e) {
+            System.out.println("Error registering for event: " + e.getMessage());
+        }
+    }
+
+    // Method to view all alumni
+    private static void viewAlumni(Connection conn) throws SQLException {
+        String query = "SELECT * FROM alumni";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                System.out.println("Name: " + rs.getString("name"));
+                System.out.println("Graduation Year: " + rs.getInt("graduation_year") + "\n");
+            }
+        }
+    }
+
+    // Method to view all event registrations
+    private static void viewEventRegistrations(Connection conn) throws SQLException {
+        String query = "SELECT * FROM event_registrations";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                System.out.println("Alumni Name: " + rs.getString("alumni_name"));
+                System.out.println("Event Name: " + rs.getString("event_name") + "\n");
+            }
+        }
+    }
+}
